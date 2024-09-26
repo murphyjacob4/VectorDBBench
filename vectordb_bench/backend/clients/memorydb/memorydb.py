@@ -10,6 +10,8 @@ from redis.commands.search.field import TagField, VectorField, NumericField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 import numpy as np
+import threading
+import queue
 
 
 log = logging.getLogger(__name__)
@@ -141,6 +143,21 @@ class MemoryDB(VectorDB):
             client.execute_command("PING")
         return client
 
+
+    def get_client_pool(self, **kwargs):
+        if not self.db_config["cmd"]:
+            return None
+        else:
+            return redis.connection.ConnectionPool(
+                host=self.db_config["host"],
+                port=self.db_config["port"],
+                db=0,
+                #ssl=self.db_config["ssl"],
+                #password=self.db_config["password"],
+                #ssl_ca_certs=self.db_config["ssl_ca_certs"],
+                #ssl_cert_reqs=None,
+            )
+
     @contextmanager
     def init(self) -> Generator[None, None, None]:
         """ create and destory connections to database.
@@ -149,6 +166,7 @@ class MemoryDB(VectorDB):
             >>> with self.init():
             >>>     self.insert_embeddings()
         """
+        self.conn_pool = self.get_client_pool()
         self.conn = self.get_client()
         search_param = self.case_config.search_param()
         if search_param["ef_runtime"]:
@@ -156,8 +174,9 @@ class MemoryDB(VectorDB):
         else:
             self.ef_runtime_str = ""
         yield
+        self.conn_pool.close()
         self.conn.close()
-        self.conn = None
+        self.conn_pool = None
 
     def ready_to_load(self) -> bool:
         pass
@@ -165,18 +184,16 @@ class MemoryDB(VectorDB):
     def optimize(self) -> None:
         self._post_insert()
 
-    def insert_embeddings(
+    def insert_embedding_batch(
         self,
-        embeddings: list[list[float]],
-        metadata: list[int],
-        **kwargs: Any,
-    ) -> Tuple[int, Optional[Exception]]:
-        """Insert embeddings into the database.
-        Should call self.init() first.
-        """
-
+        conn,
+        embeddings,
+        metadata,
+        result_queue
+    ):
         try:
-            with self.conn.pipeline(transaction=False) as pipe:
+            result_len = 0
+            with conn.pipeline(transaction=False) as pipe:
                 for i, embedding in enumerate(embeddings):
                     embedding = np.array(embedding).astype(np.float32)
                     pipe.hset(metadata[i], mapping = {
@@ -190,7 +207,54 @@ class MemoryDB(VectorDB):
 
                 pipe.execute()
                 result_len = i + 1
+            result_queue.put(result_len)
         except Exception as e:
+            print(e)
+            result_queue.put(0)
+
+    def split_list_into_parts(self, lst, num_parts):
+        # Calculate the base size for each part
+        base_size = len(lst) // num_parts
+        remainder = len(lst) % num_parts
+        
+        # Create the sizes list: distribute the remainder over the first few parts
+        sizes = [base_size + 1 if i < remainder else base_size for i in range(num_parts)]
+        
+        # Now split the list according to the calculated sizes
+        result = []
+        index = 0
+        for size in sizes:
+            result.append(lst[index:index + size])
+            index += size
+        
+        return result
+
+    def insert_embeddings(
+        self,
+        embeddings: list[list[float]],
+        metadata: list[int],
+        **kwargs: Any,
+    ) -> Tuple[int, Optional[Exception]]:
+        """Insert embeddings into the database.
+        Should call self.init() first.
+        """
+        result_len = 0
+        try:
+            threads = []
+            result_queue = queue.Queue()
+            embedding_parts = self.split_list_into_parts(embeddings, 100)
+            metadata_parts = self.split_list_into_parts(metadata, 100)
+            for i in range(100):
+                conn = redis.Redis(connection_pool=self.conn_pool)
+                thread = threading.Thread(target=self.insert_embedding_batch, args=(conn, embedding_parts[i], metadata_parts[i], result_queue,))
+                threads.append(thread)
+                thread.start()
+            for thread in threads:
+                thread.join()
+            while not result_queue.empty():
+                result_len += result_queue.get()
+        except Exception as e:
+            print(e)
             return 0, e
         
         return result_len, None
@@ -234,7 +298,7 @@ class MemoryDB(VectorDB):
         assert self.conn is not None
         
         query_vector = np.array(query).astype(np.float32).tobytes()
-        query_obj = Query(f"*=>[KNN {k} @vector $vec]").return_fields("id").paging(0, k)
+        query_obj = Query(f"*=>[KNN {k} @vector $vec {self.ef_runtime_str}]").return_fields("id").paging(0, k)
         query_params = {"vec": query_vector}
         
         if filters:
