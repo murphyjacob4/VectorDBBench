@@ -32,6 +32,8 @@ class MemoryDB(VectorDB):
         self.collection_name = INDEX_NAME
         self.target_nodes = RedisCluster.RANDOM if not self.db_config["cmd"] else None
         self.insert_batch_size = db_case_config.insert_batch_size
+        self.ingestion_thread_count = db_case_config.ingestion_thread_count
+        self.no_content = db_case_config.no_content
         self.dbsize = kwargs.get("num_rows")
 
         # Create a MemoryDB connection, if db has password configured, add it to the connection here and in init():
@@ -233,7 +235,7 @@ class MemoryDB(VectorDB):
         try:
             threads = []
             result_queue = queue.Queue()
-            thread_count = 100  # Adjust for different thread counts
+            thread_count = self.ingestion_thread_count
             embedding_parts = self.split_list_into_parts(embeddings, thread_count)
             metadata_parts = self.split_list_into_parts(metadata, thread_count)
             for i in range(thread_count):
@@ -289,18 +291,23 @@ class MemoryDB(VectorDB):
         assert self.conn is not None
         
         query_vector = np.array(query).astype(np.float32).tobytes()
-        query_obj = Query(f"*=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
+        query_obj = Query(f"*=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
         query_params = {"vec": query_vector}
         
         if filters:
             # Removing '>=' from the id_value: '>=10000'
             metadata_value = filters.get("metadata")[2:]
             if id_value and metadata_value:
-                query_obj = Query(f"(@metadata:[{metadata_value} +inf] @id:{ {id_value} })=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
+                query_obj = Query(f"(@metadata:[{metadata_value} +inf] @id:{ {id_value} })=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
             elif id_value:
                 #gets exact match for id
                 query_obj = Query(f"@id:{ {id_value} }=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
             else: #metadata only case, greater than or equal to metadata value
-                query_obj = Query(f"@metadata:[{metadata_value} +inf]=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
+                query_obj = Query(f"@metadata:[{metadata_value} +inf]=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
+
+        if self.no_content:
+            query_obj = query_obj.no_content()
+        else:
+            query_obj = query_obj.return_fields("id")
         res = self.conn.ft(INDEX_NAME).search(query_obj, query_params)
         return [int(doc["id"]) for doc in res.docs]
