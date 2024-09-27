@@ -10,6 +10,8 @@ class MemoryDBConfig(DBConfig):
     ssl: bool | None = None
     cmd: bool | None = None
     ssl_ca_certs: str | None = None
+    ingestion_thread_count: int | None = None
+    no_content: bool | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -19,6 +21,8 @@ class MemoryDBConfig(DBConfig):
             "ssl": self.ssl,
             "cmd": self.cmd,
             "ssl_ca_certs": self.ssl_ca_certs,
+            "ingestion_thread_count": self.ingestion_thread_count,
+            "no_content": self.no_content,
         }
 
 
