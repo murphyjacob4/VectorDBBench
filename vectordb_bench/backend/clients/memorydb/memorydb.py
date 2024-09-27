@@ -301,7 +301,7 @@ class MemoryDB(VectorDB):
                 query_obj = Query(f"(@metadata:[{metadata_value} +inf] @id:{ {id_value} })=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
             elif id_value:
                 #gets exact match for id
-                query_obj = Query(f"@id:{ {id_value} }=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
+                query_obj = Query(f"@id:{ {id_value} }=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
             else: #metadata only case, greater than or equal to metadata value
                 query_obj = Query(f"@metadata:[{metadata_value} +inf]=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
 
