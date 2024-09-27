@@ -289,7 +289,7 @@ class MemoryDB(VectorDB):
         assert self.conn is not None
         
         query_vector = np.array(query).astype(np.float32).tobytes()
-        query_obj = Query(f"*=>[KNN {k} @vector $vec {self.ef_runtime_str}]").return_fields("id").paging(0, k)
+        query_obj = Query(f"*=>[KNN {k} @vector $vec {self.ef_runtime_str}]").no_content().paging(0, k)
         query_params = {"vec": query_vector}
         
         if filters:
