@@ -32,8 +32,8 @@ class MemoryDB(VectorDB):
         self.collection_name = INDEX_NAME
         self.target_nodes = RedisCluster.RANDOM if not self.db_config["cmd"] else None
         self.insert_batch_size = db_case_config.insert_batch_size
-        self.ingestion_thread_count = self.db_config["ingestion_thread_count"]
-        self.no_content = self.db_config["no_content"]
+        self.ingestion_thread_count = db_case_config.ingestion_thread_count
+        self.no_content = db_case_config.no_content
         self.dbsize = kwargs.get("num_rows")
 
         # Create a MemoryDB connection, if db has password configured, add it to the connection here and in init():
