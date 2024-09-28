@@ -65,7 +65,7 @@ class MemoryDBTypedDict(TypedDict):
             help="Thread count for inserting data.",
         ),
     ]
-    insert_batch_size: Annotated[
+    no_content: Annotated[
         bool,
         click.option(
             "--no-content",
