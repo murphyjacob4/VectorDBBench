@@ -95,14 +95,14 @@ def MemoryDB(**parameters: Unpack[MemoryDBHNSWTypedDict]):
             ssl=parameters["ssl"],
             ssl_ca_certs=parameters["ssl_ca_certs"],
             cmd=parameters["cmd"],
-            ingestion_thread_count=parameters["ingestion_thread_count"],
-            no_content=parameters["no_content"],
         ),
         db_case_config=MemoryDBHNSWConfig(
             M=parameters["m"],
             ef_construction=parameters["ef_construction"],
             ef_runtime=parameters["ef_runtime"],
-            insert_batch_size=parameters["insert_batch_size"]
+            insert_batch_size=parameters["insert_batch_size"],
+            ingestion_thread_count=parameters["ingestion_thread_count"],
+            no_content=parameters["no_content"],
         ),
         **parameters,
     )
