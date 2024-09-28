@@ -56,6 +56,25 @@ class MemoryDBTypedDict(TypedDict):
             help="Batch size for inserting data. Adjust this as needed, but don't make it too big",
         ),
     ]
+    ingestion_thread_count: Annotated[
+        int,
+        click.option(
+            "--ingestion-thread-count",
+            type=int,
+            default=1,
+            help="Thread count for inserting data.",
+        ),
+    ]
+    no_content: Annotated[
+        bool,
+        click.option(
+            "--no-content",
+            is_flag=True,
+            show_default=True,
+            default=False,
+            help="Set to true to use NOCONTENT in FT.SEARCH",
+        ),
+    ]
 
 
 class MemoryDBHNSWTypedDict(CommonTypedDict, MemoryDBTypedDict, HNSWFlavor2):
@@ -82,7 +101,9 @@ def MemoryDB(**parameters: Unpack[MemoryDBHNSWTypedDict]):
             M=parameters["m"],
             ef_construction=parameters["ef_construction"],
             ef_runtime=parameters["ef_runtime"],
-            insert_batch_size=parameters["insert_batch_size"]
+            insert_batch_size=parameters["insert_batch_size"],
+            ingestion_thread_count=parameters["ingestion_thread_count"],
+            no_content=parameters["no_content"],
         ),
         **parameters,
     )
