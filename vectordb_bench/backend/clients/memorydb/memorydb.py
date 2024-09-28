@@ -297,13 +297,7 @@ class MemoryDB(VectorDB):
         if filters:
             # Removing '>=' from the id_value: '>=10000'
             metadata_value = filters.get("metadata")[2:]
-            if id_value and metadata_value:
-                query_obj = Query(f"(@metadata:[{metadata_value} +inf] @id:{ {id_value} })=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
-            elif id_value:
-                #gets exact match for id
-                query_obj = Query(f"@id:{ {id_value} }=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
-            else: #metadata only case, greater than or equal to metadata value
-                query_obj = Query(f"@metadata:[{metadata_value} +inf]=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
+            query_obj = Query(f"@metadata:[{metadata_value} +inf]=>[KNN {k} @vector $vec {self.ef_runtime_str}]").paging(0, k)
 
         if self.no_content:
             query_obj = query_obj.no_content()
