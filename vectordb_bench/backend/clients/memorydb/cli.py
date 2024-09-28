@@ -69,7 +69,8 @@ class MemoryDBTypedDict(TypedDict):
         bool,
         click.option(
             "--no-content",
-            type=int,
+            is_flag=True,
+            show_default=True,
             default=False,
             help="Set to true to use NOCONTENT in FT.SEARCH",
         ),
